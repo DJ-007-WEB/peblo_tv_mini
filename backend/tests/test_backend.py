@@ -21,6 +21,7 @@ def client(tmp_path, monkeypatch):
         finally: db.close()
     app.dependency_overrides[get_db] = override
     monkeypatch.setattr("app.main.storage", __import__("app.storage", fromlist=["LocalStorage"]).LocalStorage(tmp_path))
+    monkeypatch.setattr("app.main.CATALOG_PATH", tmp_path / "catalogue.json")
     with TestClient(app) as c: yield c
     app.dependency_overrides.clear()
 
@@ -49,3 +50,18 @@ def test_show_seasons_can_be_listed(client):
     response = client.get(f"/admin/shows/{show['id']}/seasons", headers=auth())
     assert response.status_code == 200
     assert response.json()["items"] == [season]
+
+def test_show_listing_is_server_paginated(client):
+    for index in range(3):
+        response = client.post("/admin/shows", headers=auth(), json={"title": f"Show {index}", "slug": f"show-{index}"})
+        assert response.status_code == 201
+    response = client.get("/admin/shows?page=2&limit=2", headers=auth())
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 3
+    assert body["pages"] == 2
+    assert len(body["items"]) == 1
+
+def test_readiness_and_liveness(client):
+    assert client.get("/health/live").json() == {"status": "ok"}
+    assert client.get("/health/ready").json() == {"status": "ready"}

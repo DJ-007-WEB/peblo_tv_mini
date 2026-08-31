@@ -67,6 +67,9 @@ function Card({ show, onOpen }: { show: Show; onOpen: (show: Show) => void }) {
     </button>
   );
 }
+function showArtwork(show: Show, kind: string) {
+  return show.seasons.filter((s) => s.number !== 0).flatMap((s) => s.episodes).find((e) => e.artwork[kind])?.artwork[kind];
+}
 function ShowDetail({ show, onBack }: { show: Show; onBack: () => void }) {
   const seasons = show.seasons.filter((s) => s.number !== 0);
   const first = seasons[0];
@@ -149,9 +152,10 @@ function App() {
   const [selected, setSelected] = useState<Show>();
   const [results, setResults] = useState<Show[] | null>(null);
   const [menu, setMenu] = useState(false);
+  const [searching, setSearching] = useState(false);
   useEffect(() => {
     getCatalog()
-      .then(setCatalog)
+      .then((data) => { setCatalog(data); const slug = new URLSearchParams(location.hash.replace(/^#/, "")).get("show"); if (slug) setSelected(data.sections.flatMap((section) => section.shows).find((show) => show.slug === slug)); })
       .catch((e) => setError(e.message));
   }, []);
   useEffect(() => {
@@ -159,20 +163,15 @@ function App() {
       setResults(null);
       return;
     }
-    const timer = setTimeout(
-      () =>
-        searchCatalog(q, category, language)
-          .then(setResults)
-          .catch((e) => setError(e.message)),
-      260,
-    );
-    return () => clearTimeout(timer);
+    const controller = new AbortController();
+    const timer = setTimeout(() => { setSearching(true); searchCatalog(q, category, language, controller.signal).then(setResults).catch((e) => { if (e.name !== "AbortError") setError(e.message); }).finally(() => setSearching(false)); }, 260);
+    return () => { clearTimeout(timer); controller.abort(); };
   }, [q, category, language]);
   if (selected)
     return (
       <>
         <Header q={q} setQ={setQ} menu={menu} setMenu={setMenu} />
-        <ShowDetail show={selected} onBack={() => setSelected(undefined)} />
+         <ShowDetail show={selected} onBack={() => { history.pushState({}, "", "/"); setSelected(undefined); }} />
       </>
     );
   const sections = results
@@ -195,16 +194,10 @@ function App() {
         </div>
       ) : (
         <main>
-          <section className="hero">
-            <div className="hero-copy">
-              <p className="kicker">PEBLO TV  ·  NEW STORIES</p>
-              <h1>Big little adventures</h1>
-              <p>
-                Stories made for curious minds and the grown-ups who watch with them.
-              </p>
-            </div>
-          </section>
-          <section className="filters" id="browse">
+           <section className="hero">
+             {(() => { const featured = catalog.sections.find((s) => s.name === "featured")?.shows[0] ?? catalog.sections[0]?.shows[0]; return featured ? <><Art wide url={showArtwork(featured, "banner") || showArtwork(featured, "thumbnail")} alt="" /><div className="hero-copy"><p className="kicker">PEBLO TV  ·  {featured.section || "NEW STORIES"}</p><h1>{featured.title}</h1><p>{featured.synopsis || "Stories made for curious minds and the grown-ups who watch with them."}</p><button onClick={() => setSelected(featured)}>View show <span>→</span></button></div></> : <div className="hero-copy"><p className="kicker">PEBLO TV</p><h1>Big little adventures</h1><p>Stories made for curious minds and the grown-ups who watch with them.</p></div>; })()}
+           </section>
+           <section className="filters" id="browse" aria-label="Catalogue filters">
             <div className="filter-search">
               ⌕
               <input
@@ -213,7 +206,7 @@ function App() {
                 placeholder="What do you want to explore?"
               />
             </div>
-            <select
+             <select aria-label="Filter by category"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
             >
@@ -222,14 +215,16 @@ function App() {
                 <option key={c}>{c}</option>
               ))}
             </select>
-            <select
+             <select aria-label="Filter by language"
               value={language}
               onChange={(e) => setLanguage(e.target.value)}
             >
               <option value="">All languages</option>
               <option value="en">English</option>
               <option value="hi">हिन्दी</option>
-            </select>
+             </select>
+             {(q || category || language) && <button className="clear-filters" onClick={() => { setQ(""); setCategory(""); setLanguage(""); }}>Clear</button>}
+             {searching && <span className="search-status" aria-live="polite">Searching…</span>}
           </section>
           <div className="rows" id="new">
             {sections.map((section) => (
@@ -240,7 +235,7 @@ function App() {
                 </div>
                 <div className="cards">
                   {section.shows.map((s) => (
-                    <Card key={s.slug} show={s} onOpen={setSelected} />
+                     <Card key={s.slug} show={s} onOpen={(show) => { history.pushState({}, "", `#show=${show.slug}`); setSelected(show); }} />
                   ))}
                 </div>
               </section>

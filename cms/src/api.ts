@@ -27,6 +27,7 @@ export type Show = {
   categories: string[];
   status: string;
 };
+export type Page<T> = { items: T[]; page: number; limit: number; total: number; pages: number };
 export type Issue = { message?: string; id?: number; content_group?: string };
 export type Report = { blocking: boolean; issues: Record<string, Issue[]> };
 export type Run = {

@@ -2,16 +2,17 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
 import io, json
+from threading import Lock
 from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from PIL import Image, UnidentifiedImageError
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from .auth import require_admin, require_editor
 from .catalog import build_catalog, catalog_bytes
-from .config import STORAGE_DIR
+from .config import ALLOWED_ORIGINS, CATALOG_PATH, STORAGE_DIR
 from .db import Base, engine, get_db
 from .models import Artwork, Episode, PublishRun, Season, Show
 from .schemas import EpisodeIn, SeasonIn, ShowIn, episode_out, season_out, show_out
@@ -20,12 +21,12 @@ from .validation import validation_report
 
 @asynccontextmanager
 async def lifespan(app):
-    Base.metadata.create_all(engine)
     yield
 
 app = FastAPI(title="Peblo TV API", lifespan=lifespan)
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(CORSMiddleware, allow_origins=ALLOWED_ORIGINS, allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"], allow_headers=["Authorization", "Content-Type"],)
 app.mount("/artwork", StaticFiles(directory=str(STORAGE_DIR)), name="artwork")
+publish_lock = Lock()
 
 def commit(db):
     try: db.commit()
@@ -41,21 +42,35 @@ def ensure_episode_key(db, content_group, language, exclude_id=None):
 def health(db: Session = Depends(get_db)):
     db.execute(select(1)); return {"status": "ok"}
 
+@app.get("/health/live")
+def live():
+    return {"status": "ok"}
+
+@app.get("/health/ready")
+def ready(db: Session = Depends(get_db)):
+    try:
+        db.execute(select(1))
+        json.loads(storage.read_catalog(CATALOG_PATH))
+    except Exception as exc:
+        raise HTTPException(503, "Service is not ready.") from exc
+    return {"status": "ready"}
+
 @app.get("/auth/me")
 def me(user=Depends(require_editor)):
     return user
 
 @app.get("/admin/shows")
-def list_shows(q: str | None = None, section: str | None = None, status: str | None = None, language: str | None = None, db: Session = Depends(get_db), _=Depends(require_editor)):
-    shows = db.scalars(select(Show).order_by(Show.title, Show.id)).all()
+def list_shows(q: str | None = None, section: str | None = None, status: str | None = None, language: str | None = None, page: int = Query(1, ge=1), limit: int = Query(12, ge=1, le=100), db: Session = Depends(get_db), _=Depends(require_editor)):
+    query = select(Show).order_by(Show.title, Show.id)
+    if q: query = query.where(Show.title.ilike(f"%{q}%"))
+    if section: query = query.where(Show.section == section)
+    if status: query = query.where(Show.status == status)
+    if language: query = query.where(Show.seasons.any(Season.episodes.any(Episode.language == language)))
+    total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
+    shows = db.scalars(query.offset((page - 1) * limit).limit(limit)).all()
     out = []
-    for show in shows:
-        if q and q.lower() not in show.title.lower(): continue
-        if section and show.section != section: continue
-        if status and show.status != status: continue
-        if language and not any(e.language == language for s in show.seasons for e in s.episodes): continue
-        out.append(show_out(show))
-    return {"items": out}
+    for show in shows: out.append(show_out(show))
+    return {"items": out, "page": page, "limit": limit, "total": total, "pages": (total + limit - 1) // limit}
 
 @app.post("/admin/shows", status_code=201)
 def create_show(body: ShowIn, db: Session = Depends(get_db), _=Depends(require_editor)):
@@ -121,6 +136,12 @@ def get_episode(episode_id: int, db: Session = Depends(get_db), _=Depends(requir
     if not ep: raise HTTPException(404, "Episode not found")
     return episode_out(ep)
 
+@app.get("/admin/seasons/{season_id}/episodes")
+def list_episodes(season_id: int, db: Session = Depends(get_db), _=Depends(require_editor)):
+    season = db.get(Season, season_id)
+    if not season: raise HTTPException(404, "Season not found")
+    return {"items": [episode_out(e) for e in sorted(season.episodes, key=lambda e: (e.number, e.id))]}
+
 @app.patch("/admin/episodes/{episode_id}")
 def update_episode(episode_id: int, body: EpisodeIn, db: Session = Depends(get_db), _=Depends(require_editor)):
     ep = db.get(Episode, episode_id)
@@ -160,28 +181,33 @@ def report(db: Session = Depends(get_db), _=Depends(require_editor)): return val
 
 @app.post("/admin/catalog/publish")
 def publish(user=Depends(require_admin), db: Session = Depends(get_db)):
+    if not publish_lock.acquire(blocking=False):
+        raise HTTPException(409, "Another catalogue publish is already running.")
     report_data = validation_report(db)
     run = PublishRun(actor=user["name"]); db.add(run); db.flush()
     if report_data["blocking"]:
         run.outcome, run.error, run.finished_at = "blocked", "Validation report has blocking issues", datetime.utcnow(); commit(db)
+        publish_lock.release()
         raise HTTPException(422, {"message": "Publish blocked.", "report": report_data})
     try:
-        data = catalog_bytes(db); storage.write_catalog_atomic(data)
-        catalogue = build_catalog(db); run.show_count = sum(len(s["shows"]) for s in catalogue["sections"]); run.episode_count = sum(len(e["episodes"]) for s in catalogue["sections"] for sh in s["shows"] for e in sh["seasons"]); run.outcome, run.finished_at = "success", datetime.utcnow(); commit(db)
-        return {"run_id": run.id, "outcome": run.outcome, "show_count": run.show_count, "episode_count": run.episode_count}
+        catalogue = build_catalog(db); data = json.dumps(catalogue, sort_keys=True, separators=(",", ":")).encode(); storage.write_catalog_atomic(data, CATALOG_PATH)
+        run.show_count = sum(len(s["shows"]) for s in catalogue["sections"]); run.episode_count = sum(len(e["episodes"]) for s in catalogue["sections"] for sh in s["shows"] for e in sh["seasons"]); run.outcome, run.finished_at = "success", datetime.utcnow(); commit(db)
+        result = {"run_id": run.id, "outcome": run.outcome, "show_count": run.show_count, "episode_count": run.episode_count}
+        publish_lock.release()
+        return result
     except Exception as exc:
-        db.rollback(); run.outcome, run.error, run.finished_at = "failed", str(exc), datetime.utcnow(); db.add(run); db.commit(); raise HTTPException(500, "Catalogue publish failed.") from exc
+        db.rollback(); run.outcome, run.error, run.finished_at = "failed", str(exc), datetime.utcnow(); db.add(run); db.commit(); publish_lock.release(); raise HTTPException(500, "Catalogue publish failed.") from exc
 
 @app.get("/admin/catalog/runs")
 def runs(db: Session = Depends(get_db), _=Depends(require_editor)):
     return {"items": [{"id": r.id, "actor": r.actor, "started_at": r.started_at, "finished_at": r.finished_at, "outcome": r.outcome, "show_count": r.show_count, "episode_count": r.episode_count, "error": r.error} for r in db.scalars(select(PublishRun).order_by(PublishRun.id.desc())).all()]}
 
 @app.get("/catalog")
-def catalog(): return json.loads(storage.read_catalog())
+def catalog(): return json.loads(storage.read_catalog(CATALOG_PATH))
 
 @app.get("/catalog/search")
 def search(q: str = "", category: str | None = None, language: str | None = None, section: str | None = None):
-    data = json.loads(storage.read_catalog()); result = []
+    data = json.loads(storage.read_catalog(CATALOG_PATH)); result = []
     for sec in data["sections"]:
         if section and sec["name"] != section: continue
         for show in sec["shows"]:

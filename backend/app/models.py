@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, JSON
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, JSON, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .db import Base
 
@@ -37,6 +37,10 @@ class Episode(Base):
     status: Mapped[str] = mapped_column(String(20), default="draft", index=True)
     season: Mapped[Season] = relationship(back_populates="episodes")
     artwork: Mapped[list["Artwork"]] = relationship(back_populates="episode", cascade="all, delete-orphan")
+    __table_args__ = (
+        UniqueConstraint("season_id", "number", name="uq_episode_season_number"),
+        Index("ix_episode_status_group_language", "status", "content_group", "language"),
+    )
 
 class Artwork(Base):
     __tablename__ = "artwork"

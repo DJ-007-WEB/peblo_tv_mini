@@ -94,6 +94,41 @@ The production deploy step is intentionally not connected to a cloud account;
 the image build output is ready to publish to a registry and deploy through a
 managed container platform with secrets supplied by its secret manager.
 
+## Deployment
+
+The intended production shape is three immutable containers: the API, CMS, and
+viewer, backed by managed PostgreSQL and object storage. Build each image from a
+commit SHA, push it to a private registry, and deploy the images through the
+platform's release mechanism. Put the CMS and viewer behind the same ingress as
+the API, restrict database access to the API network, and configure the frontend
+build argument `VITE_API_BASE` to the public API URL.
+
+Before a rollout, provision the database and run the schema initialization job,
+then run the seed/import job once if this is a new environment. Inject
+`DATABASE_URL`, `EDITOR_TOKEN`, `ADMIN_TOKEN`, `ALLOWED_ORIGINS`,
+`STORAGE_DIR`, and `CATALOG_PATH` through the platform secret/configuration
+store. Do not use the demo credentials in production. For R2 or S3, replace
+`LocalStorage` with an adapter using versioned objects and a current-catalogue
+pointer; all API and catalogue code should retain the same storage contract.
+
+For the included container image, the database migration command is
+`python -m alembic -c alembic.ini upgrade head`; Compose runs it before the
+idempotent seed command. Existing databases created by the original prototype
+should be backed up and migrated in a staging environment before upgrading.
+
+Configure `/health/live` as the liveness probe and `/health/ready` as the
+readiness probe. Roll out the API only after readiness succeeds, then roll out
+the static UIs. After deployment, verify the public viewer, `/catalog`, an
+authenticated CMS request, and one artwork URL. Alert on repeated readiness
+failures, catalogue-read failures, or failed publish runs because they indicate
+either viewer downtime or stale editorial content.
+
+Keep database backups and retain the last known-good catalogue object. A failed
+publish must leave the previous catalogue active. For an emergency rollback,
+redeploy the previous image SHA and restore the previous catalogue pointer;
+database migrations should use an expand/contract process and be rolled forward
+rather than destructively downgraded.
+
 ## Scope
 
 Versioned catalogue rollback, dry-run diffs, audit history, video streaming, and

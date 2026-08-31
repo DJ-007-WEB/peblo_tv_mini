@@ -92,7 +92,7 @@ function Login({ onLogin }: { onLogin: (user: User) => void }) {
         <div className="demo-access">
           <small>Local demo access</small>
           <div>
-            <button
+                   <button
               type="button"
               className="text-button"
               onClick={() => enter("peblo-editor-token")}
@@ -140,7 +140,7 @@ function ArtworkSlot({
       <div className={`art-preview ${kind}`}>
         {preview || existing ? (
           <img src={preview || imageUrl(existing!)} />
-        ) : (
+             ) : (
           <span>＋</span>
         )}
       </div>
@@ -150,9 +150,13 @@ function ArtworkSlot({
         disabled={!onUpload}
         onChange={async (e) => {
           const file = e.target.files?.[0];
-          if (!file || !onUpload) return;
-          setError("");
-          setPreview(URL.createObjectURL(file));
+           if (!file || !onUpload) return;
+           setError("");
+           if (file.size > 200 * 1024) { setError("This image is larger than 200 KB. Choose a smaller file."); return; }
+           const required = { poster: [600, 900], banner: [1280, 720], thumbnail: [640, 360] }[kind] ?? [];
+           const dimensions = await new Promise<[number, number] | null>((resolve) => { const image = new Image(); image.onload = () => resolve([image.width, image.height]); image.onerror = () => resolve(null); image.src = URL.createObjectURL(file); });
+           if (!dimensions || dimensions[0] !== required[0] || dimensions[1] !== required[1]) { setError(`${kind} must be exactly ${required[0]} × ${required[1]} pixels.`); return; }
+           setPreview(URL.createObjectURL(file));
           try {
             await onUpload(kind, file);
           } catch (err) {
@@ -174,11 +178,16 @@ function EpisodeManager({ showId }: { showId: number }) {
   const [season, setSeason] = useState<Season>();
   const [episode, setEpisode] = useState<Episode>();
   const [title, setTitle] = useState("");
+  const [duration, setDuration] = useState("300");
+  const [language, setLanguage] = useState("en");
+  const [contentGroup, setContentGroup] = useState("");
+  const [episodeStatus, setEpisodeStatus] = useState("draft");
+  const [episodeNumber, setEpisodeNumber] = useState("");
   const [seasonTitle, setSeasonTitle] = useState("Main season");
   const [loading, setLoading] = useState(true);
   const loadSeason = async (item: Season, clearEpisode = true) => {
     setSeason(await request<Season>(`/admin/seasons/${item.id}`));
-    if (clearEpisode) setEpisode(undefined);
+    if (clearEpisode) { setEpisode(undefined); setEpisodeNumber(String((item.episodes?.length ?? 0) + 1)); setContentGroup(`${showId}-s${item.number}-e${(item.episodes?.length ?? 0) + 1}`); }
   };
   const load = async () => {
     setLoading(true);
@@ -213,28 +222,20 @@ function EpisodeManager({ showId }: { showId: number }) {
     }
   };
   const save = async () => {
-    if (!season || !title.trim()) return;
+    if (!season || !title.trim() || !episodeNumber || !contentGroup.trim()) return;
     try {
-      const ep = await request<Episode>(
-        `/admin/seasons/${season.id}/episodes`,
-        {
-          method: "POST",
-          body: JSON.stringify({
-            number: (season.episodes?.length ?? 0) + 1,
-            title: title.trim(),
-            duration_seconds: 300,
-            language: "en",
-            content_group: `${showId}-${Date.now()}`,
-            status: "draft",
-          }),
-        },
-      );
+      const payload = { number: Number(episodeNumber), title: title.trim(), duration_seconds: duration ? Number(duration) : null, language, content_group: contentGroup.trim(), status: episodeStatus };
+      const ep = await request<Episode>(episode ? `/admin/episodes/${episode.id}` : `/admin/seasons/${season.id}/episodes`, { method: episode ? "PATCH" : "POST", body: JSON.stringify(payload) });
       setEpisode(ep);
       setTitle("");
+      setEpisodeNumber(""); setContentGroup(""); setDuration("300"); setEpisodeStatus("draft"); setLanguage("en");
       await loadSeason(season, false);
     } catch (e) {
       alert((e as Error).message);
     }
+  };
+  const editEpisode = (item: Episode) => {
+    setEpisode(item); setTitle(item.title); setEpisodeNumber(String(item.number)); setDuration(item.duration_seconds ? String(item.duration_seconds) : ""); setLanguage(item.language); setContentGroup(item.content_group); setEpisodeStatus(item.status);
   };
   const upload = async (kind: string, file: File) => {
     if (!episode) return;
@@ -273,12 +274,13 @@ function EpisodeManager({ showId }: { showId: number }) {
               if (found) void loadSeason(found);
             }}
           >
-            {seasons.map((s) => (
+           {seasons.map((s) => (
               <option key={s.id} value={s.id}>
                 Season {s.number}: {s.title || "Untitled"}
               </option>
-            ))}
+           ))}
           </select>
+          {season && <><button className="text-button" type="button" onClick={async () => { const next = prompt("Season title", season.title); if (next !== null) { await request(`/admin/seasons/${season.id}`, { method: "PATCH", body: JSON.stringify({ number: season.number, title: next }) }); await load(); } }}>Rename</button><button className="text-button danger" type="button" onClick={async () => { if (confirm("Delete this season and all its episodes?")) { await request(`/admin/seasons/${season.id}`, { method: "DELETE" }); await load(); } }}>Delete</button></>}
         </label>
       )}
       {!season && (
@@ -308,21 +310,21 @@ function EpisodeManager({ showId }: { showId: number }) {
             </small>
           </div>
           <span className={`status ${e.status}`}>{e.status}</span>
-          <button className="text-button" onClick={() => setEpisode(e)}>
-            Artwork
-          </button>
+          <div className="line-actions"><button className="text-button" onClick={() => editEpisode(e)}>Edit</button><button className="text-button danger" onClick={async () => { if (confirm(`Delete ${e.title}?`)) { await request(`/admin/episodes/${e.id}`, { method: "DELETE" }); if (episode?.id === e.id) setEpisode(undefined); await loadSeason(season, false); } }}>Delete</button></div>
         </div>
       ))}
       {season && (
         <div className="quick-add">
-          <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="New episode title"
-          />
-          <Button type="button" onClick={save} disabled={!title.trim()}>
-            Add episode
+          <input value={episodeNumber} onChange={(e) => setEpisodeNumber(e.target.value)} placeholder="No." type="number" min="1" />
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={episode ? "Episode title" : "New episode title"} />
+          <input value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="Duration (seconds)" type="number" min="1" />
+          <select value={language} onChange={(e) => setLanguage(e.target.value)}><option value="en">English</option><option value="hi">Hindi</option></select>
+          <input value={contentGroup} onChange={(e) => setContentGroup(e.target.value)} placeholder="Content group" />
+          <select value={episodeStatus} onChange={(e) => setEpisodeStatus(e.target.value)}><option value="draft">Draft</option><option value="published">Published</option></select>
+          <Button type="button" onClick={save} disabled={!title.trim() || !episodeNumber || !contentGroup.trim()}>
+            {episode ? "Save episode" : "Add episode"}
           </Button>
+          {episode && <button className="text-button" onClick={() => { setEpisode(undefined); setTitle(""); }}>New</button>}
         </div>
       )}
       {episode && (
@@ -446,7 +448,7 @@ function ShowEditor({
           <span className="field-label">Categories</span>
           <div className="chips">
             {categories.map((c) => (
-              <button
+                   <button
                 type="button"
                 className={
                   form.categories.includes(c) ? "chip selected" : "chip"
@@ -581,19 +583,22 @@ function Content({ onLogout, user }: { onLogout: () => void; user: User }) {
   const [editing, setEditing] = useState<Show | "new" | null>(null);
   const [report, setReport] = useState<Report>();
   const [runs, setRuns] = useState<Run[]>([]);
+  const [total, setTotal] = useState(0);
+  const [pages, setPages] = useState(1);
   const refresh = () => {
     setLoading(true);
     setError("");
-    request<{ items: Show[] }>(
-      `/admin/shows?q=${encodeURIComponent(q)}&status=${status}&section=${section}&language=${language}`,
+      request<{ items: Show[]; total: number; pages: number }>(
+      `/admin/shows?q=${encodeURIComponent(q)}&status=${status}&section=${section}&language=${language}&page=${page}&limit=12`,
     )
-      .then((x) => setShows(x.items))
+      .then((x) => { setShows(x.items); setTotal(x.total); setPages(x.pages); })
       .catch((e) => setError((e as Error).message))
       .finally(() => setLoading(false));
   };
   useEffect(() => {
     refresh();
-  }, [q, status, section, language]);
+  }, [q, status, section, language, page]);
+  useEffect(() => { setPage(1); }, [q, status, section, language]);
   useEffect(() => {
     if (tab === "publish" && user.role === "admin") {
       request<Report>("/admin/validation-report")
@@ -604,7 +609,7 @@ function Content({ onLogout, user }: { onLogout: () => void; user: User }) {
         .catch(() => {});
     }
   }, [tab, user.role]);
-  const visible = shows.slice((page - 1) * 8, page * 8);
+  const visible = shows;
   return (
     <div className="app-shell">
       <aside>
@@ -721,22 +726,20 @@ function Content({ onLogout, user }: { onLogout: () => void; user: User }) {
             ) : (
               <div className="show-grid">
                 {visible.map((show) => (
-                  <button
-                    className="show-card"
-                    key={show.id}
-                    onClick={() => setEditing(show)}
-                  >
+                  <article className="show-card" key={show.id}>
                     <span className="show-art">{show.title[0]}</span>
-                    <span className="show-name">
+                     <button className="show-name" onClick={() => setEditing(show)}>
                       <strong>{show.title}</strong>
                       <small>
                         {show.section ?? "Unassigned"} · {show.status}
                       </small>
-                    </span>
-                  </button>
+                     </button>
+                    <span className="card-actions"><button className="text-button" onClick={() => setEditing(show)}>Edit</button><button className="text-button danger" onClick={async (e) => { e.stopPropagation(); if (confirm(`Delete ${show.title} and all its episodes?`)) { await request(`/admin/shows/${show.id}`, { method: "DELETE" }); refresh(); } }}>Delete</button></span>
+                    </article>
                 ))}
               </div>
             )}
+            {total > 0 && <div className="pagination"><span>Showing {(page - 1) * 12 + 1}-{Math.min(page * 12, total)} of {total}</span><div><button className="text-button" disabled={page <= 1} onClick={() => setPage(page - 1)}>Previous</button><button className="text-button" disabled={page >= pages} onClick={() => setPage(page + 1)}>Next</button></div></div>}
           </>
         )}
       </main>
