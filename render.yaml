@@ -5,17 +5,11 @@ services:
     dockerfilePath: ./backend/Dockerfile
     dockerContext: .
     healthCheckPath: /health/ready
-    plan: starter
+    plan: free
     dockerCommand: alembic upgrade head && python -m app.seed /app/seed_shows.json && uvicorn app.main:app --host 0.0.0.0 --port 8000
-    disk:
-      name: peblo-storage
-      mountPath: /app/storage
-      sizeGB: 1
     envVars:
       - key: DATABASE_URL
-        fromDatabase:
-          name: peblo-db
-          property: connectionString
+        sync: false
       - key: STORAGE_DIR
         value: /app/storage
       - key: CATALOG_PATH
@@ -34,7 +28,7 @@ services:
     runtime: docker
     dockerfilePath: ./cms/Dockerfile
     dockerContext: .
-    plan: starter
+    plan: free
     envVars:
       - key: VITE_API_BASE
         value: https://peblo-api.onrender.com
@@ -46,15 +40,9 @@ services:
     runtime: docker
     dockerfilePath: ./viewer/Dockerfile
     dockerContext: .
-    plan: starter
+    plan: free
     envVars:
       - key: VITE_API_BASE
         value: https://peblo-api.onrender.com
       - key: API_BASE_URL
         value: https://peblo-api.onrender.com
-
-databases:
-  - name: peblo-db
-    plan: starter
-    databaseName: peblo
-    user: peblo

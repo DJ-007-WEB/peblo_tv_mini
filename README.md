@@ -131,16 +131,21 @@ rather than destructively downgraded.
 
 ### Render Bootstrap
 
-The repository includes `render.yaml` for a generic Render deployment. In the
-Render dashboard, create a Blueprint from this repository, then enter strong
-values for `EDITOR_TOKEN` and `ADMIN_TOKEN` when prompted. The Blueprint creates
-the API, CMS, viewer, PostgreSQL database, and a persistent API storage disk.
-After the first deploy, confirm the generated service hostnames match the
-`VITE_API_BASE` and `ALLOWED_ORIGINS` values in `render.yaml`; update those
-values if Render assigns different names and redeploy the two frontend services.
-The API command runs Alembic, imports the seed data idempotently, and starts
-only after the database is reachable. The CMS is available at the CMS service
-URL and the public viewer at the viewer service URL.
+The repository includes `render.yaml` for a no-card demo deployment. In the
+Render dashboard, create a Blueprint from this repository, enter strong values
+for `EDITOR_TOKEN` and `ADMIN_TOKEN`, and supply a free external PostgreSQL
+connection string (Neon or Supabase) for `DATABASE_URL`. The Blueprint creates
+three free web services: API, CMS, and viewer. After the first deploy, confirm
+the generated service hostnames match the `VITE_API_BASE` and
+`ALLOWED_ORIGINS` values in `render.yaml`; update those values if Render
+assigns different names and redeploy the frontend services.
+
+The free Render tier has an ephemeral filesystem and may sleep when idle, so
+uploaded artwork and a locally generated catalogue are not durable across
+restarts. This is suitable for a review/demo environment because the API
+re-runs the idempotent seed import on startup. Production should use a paid
+persistent disk or R2/S3 adapter for artwork and catalogue storage, plus a
+managed database with backups.
 
 ## Scope
 
