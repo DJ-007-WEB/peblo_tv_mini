@@ -134,7 +134,9 @@ rather than destructively downgraded.
 The repository includes `render.yaml` for a no-card demo deployment. In the
 Render dashboard, create a Blueprint from this repository, enter strong values
 for `EDITOR_TOKEN` and `ADMIN_TOKEN`, and supply a free external PostgreSQL
-connection string (Neon or Supabase) for `DATABASE_URL`. The Blueprint creates
+connection string (Neon or Supabase) for `DATABASE_URL`. Standard PostgreSQL
+URLs beginning with `postgresql://` are normalized automatically to use the
+installed psycopg driver. The Blueprint creates
 three free web services: API, CMS, and viewer. After the first deploy, confirm
 the generated service hostnames match the `VITE_API_BASE` and
 `ALLOWED_ORIGINS` values in `render.yaml`; update those values if Render
