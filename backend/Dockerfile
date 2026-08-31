@@ -5,6 +5,7 @@ COPY backend/pyproject.toml ./
 RUN pip install --no-cache-dir .
 COPY backend/app ./app
 COPY seed_shows.json reference.json ./
+COPY assets ./assets
 RUN mkdir -p /app/storage
 
 EXPOSE 8000

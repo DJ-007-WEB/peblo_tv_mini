@@ -4,7 +4,15 @@ from pathlib import Path
 import sys
 from sqlalchemy import select
 from .db import Base, SessionLocal, engine
-from .models import Episode, Season, Show
+from .models import Artwork, Episode, Season, Show
+from .storage import storage
+
+ARTWORK_FILES = {
+    "poster": "poster_good.jpg",
+    "banner": "banner_good.jpg",
+    "thumbnail": "thumb_good.jpg",
+}
+ARTWORK_DIMENSIONS = {"poster": (600, 900), "banner": (1280, 720), "thumbnail": (640, 360)}
 
 def seed(source: Path):
     Base.metadata.create_all(engine)
@@ -19,8 +27,19 @@ def seed(source: Path):
             season = db.scalar(select(Season).where(Season.show_id == show.id, Season.number == row["season_number"]))
             if not season:
                 season = Season(show_id=show.id, number=row["season_number"]); db.add(season); db.flush()
-            if not db.scalar(select(Episode).where(Episode.external_id == row["episode_id"])):
-                db.add(Episode(external_id=row["episode_id"], season_id=season.id, number=row["episode_number"], title=row["episode_title"], duration_seconds=row.get("duration_seconds"), language=row.get("language", "en"), content_group=row["content_group"], status=row.get("status", "draft")))
+            episode = db.scalar(select(Episode).where(Episode.external_id == row["episode_id"]))
+            if not episode:
+                episode = Episode(external_id=row["episode_id"], season_id=season.id, number=row["episode_number"], title=row["episode_title"], duration_seconds=row.get("duration_seconds"), language=row.get("language", "en"), content_group=row["content_group"], status=row.get("status", "draft"))
+                db.add(episode)
+                db.flush()
+            for kind in row.get("artwork_available", []):
+                source_file = source.parent / "assets" / ARTWORK_FILES.get(kind, "")
+                if not source_file.exists() or db.scalar(select(Artwork).where(Artwork.episode_id == episode.id, Artwork.kind == kind)):
+                    continue
+                data = source_file.read_bytes()
+                path = storage.save(f"episodes/{episode.id}/{kind}.jpg", data)
+                width, height = ARTWORK_DIMENSIONS[kind]
+                db.add(Artwork(episode_id=episode.id, kind=kind, path=path, width=width, height=height, size_bytes=len(data)))
         db.commit()
     finally: db.close()
     return len(rows)
