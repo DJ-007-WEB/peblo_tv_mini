@@ -27,10 +27,16 @@ Demo tokens use the defaults in `.env.example`:
 - Editor: `peblo-editor-token`
 - Admin: `peblo-admin-token`
 
+The CMS login screen also provides these local demo-token buttons. Do not use
+these defaults outside local development; set strong values through environment
+secrets in a deployed environment.
+
 The seed import is idempotent. It imports the 95 supplied rows and retains the
-deliberate data problems in the validation workflow. Upload the supplied good
-artwork through the CMS before publishing; invalid samples demonstrate the
-server-side error messages.
+deliberate data problems in the validation workflow. The viewer is empty until
+an admin successfully publishes a catalogue. Open the CMS first, use the admin
+token, review the validation report, upload the supplied good artwork, resolve
+the duplicate variant, and publish. Invalid samples demonstrate the server-side
+error messages.
 
 ## Structure
 
