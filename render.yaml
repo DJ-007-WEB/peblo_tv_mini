@@ -31,9 +31,9 @@ services:
     plan: free
     envVars:
       - key: VITE_API_BASE
-        value: https://peblo-api.onrender.com
+        value: https://peblo-api-l2mv.onrender.com
       - key: API_BASE_URL
-        value: https://peblo-api.onrender.com
+        value: https://peblo-api-l2mv.onrender.com
 
   - type: web
     name: peblo-viewer

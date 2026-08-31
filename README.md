@@ -141,6 +141,8 @@ three free web services: API, CMS, and viewer. After the first deploy, confirm
 the generated service hostnames match the `VITE_API_BASE` and
 `ALLOWED_ORIGINS` values in `render.yaml`; update those values if Render
 assigns different names and redeploy the frontend services.
+The API root returns a service-status response; use `/health/ready` for
+readiness and `/docs` for interactive API documentation.
 
 The free Render tier has an ephemeral filesystem and may sleep when idle, so
 uploaded artwork and a locally generated catalogue are not durable across

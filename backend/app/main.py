@@ -28,6 +28,10 @@ app.add_middleware(CORSMiddleware, allow_origins=ALLOWED_ORIGINS, allow_methods=
 app.mount("/artwork", StaticFiles(directory=str(STORAGE_DIR)), name="artwork")
 publish_lock = Lock()
 
+@app.get("/")
+def root():
+    return {"service": "peblo-tv-api", "status": "ok", "docs": "/docs", "health": "/health/ready"}
+
 def commit(db):
     try: db.commit()
     except IntegrityError as exc:
