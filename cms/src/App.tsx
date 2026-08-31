@@ -50,11 +50,9 @@ function Login({ onLogin }: { onLogin: (user: User) => void }) {
     setToken(token);
     getCurrentUser()
       .then(onLogin)
-      .catch(() =>
-        setError(
-          "The API is not running yet. Start the backend or Docker Compose.",
-        ),
-      );
+      .catch((err) => setError((err as Error).message === "Invalid bearer token"
+        ? "That access token is not valid for this deployment. Check the EDITOR_TOKEN or ADMIN_TOKEN value in Render."
+        : "The API could not be reached. Check the deployment health and try again."));
   };
   return (
     <main className="login">
