@@ -3,8 +3,8 @@ import os
 
 ROOT = Path(__file__).resolve().parents[2]
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///" + str(ROOT / "backend" / "peblo.db"))
-if DATABASE_URL.startswith("postgresql://"):
-    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg://", 1)
+if DATABASE_URL.startswith(("postgresql://", "postgres://")):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1).replace("postgresql://", "postgresql+psycopg://", 1)
 STORAGE_DIR = Path(os.getenv("STORAGE_DIR", str(ROOT / "backend" / "storage")))
 CATALOG_PATH = Path(os.getenv("CATALOG_PATH", str(STORAGE_DIR / "catalogue.json")))
 EDITOR_TOKEN = os.getenv("EDITOR_TOKEN", "peblo-editor-token")
