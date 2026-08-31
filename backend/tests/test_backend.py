@@ -65,3 +65,10 @@ def test_show_listing_is_server_paginated(client):
 def test_readiness_and_liveness(client):
     assert client.get("/health/live").json() == {"status": "ok"}
     assert client.get("/health/ready").json() == {"status": "ready"}
+
+def test_language_variants_can_share_episode_number(client):
+    show = client.post("/admin/shows", headers=auth(), json={"title":"T","slug":"variants"}).json()
+    season = client.post(f"/admin/shows/{show['id']}/seasons", headers=auth(), json={"number":1}).json()
+    common = {"number": 1, "title": "Hello", "duration_seconds": 10, "content_group": "same-episode", "status": "draft"}
+    assert client.post(f"/admin/seasons/{season['id']}/episodes", headers=auth(), json={**common, "language":"en"}).status_code == 201
+    assert client.post(f"/admin/seasons/{season['id']}/episodes", headers=auth(), json={**common, "language":"hi"}).status_code == 201
