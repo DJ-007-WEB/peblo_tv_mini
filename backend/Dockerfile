@@ -8,9 +8,11 @@ RUN pip install --no-cache-dir .
 COPY backend/app ./app
 COPY backend/alembic.ini ./
 COPY backend/alembic ./alembic
+COPY backend/start.sh ./start.sh
 COPY seed_shows.json reference.json ./
 COPY assets ./assets
 RUN mkdir -p /app/storage
+RUN chmod +x /app/start.sh
 # The mounted storage volume may be owned by the previous image. Keep the
 # demo entrypoint compatible with upgraded named volumes; production runners
 # should provide a volume with an explicit non-root ownership policy.

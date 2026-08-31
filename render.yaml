@@ -6,7 +6,7 @@ services:
     dockerContext: .
     healthCheckPath: /health/ready
     plan: free
-    dockerCommand: alembic upgrade head && python -m app.seed /app/seed_shows.json && uvicorn app.main:app --host 0.0.0.0 --port 8000
+    dockerCommand: /app/start.sh
     envVars:
       - key: DATABASE_URL
         sync: false
