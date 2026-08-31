@@ -81,6 +81,12 @@ def create_season(show_id: int, body: SeasonIn, db: Session = Depends(get_db), _
     if not db.get(Show, show_id): raise HTTPException(404, "Show not found")
     season = Season(show_id=show_id, **body.model_dump()); db.add(season); commit(db); db.refresh(season); return season_out(season)
 
+@app.get("/admin/shows/{show_id}/seasons")
+def list_seasons(show_id: int, db: Session = Depends(get_db), _=Depends(require_editor)):
+    if not db.get(Show, show_id): raise HTTPException(404, "Show not found")
+    seasons = db.scalars(select(Season).where(Season.show_id == show_id).order_by(Season.number, Season.id)).all()
+    return {"items": [season_out(season) for season in seasons]}
+
 @app.get("/admin/seasons/{season_id}")
 def get_season(season_id: int, db: Session = Depends(get_db), _=Depends(require_editor)):
     season = db.get(Season, season_id)

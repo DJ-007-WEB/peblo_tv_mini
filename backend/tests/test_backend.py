@@ -42,3 +42,10 @@ def test_artwork_rejects_wrong_dimensions(client):
     ep = client.post(f"/admin/seasons/{season['id']}/episodes", headers=auth(), json={"number":1,"title":"E","content_group":"x"}).json()
     res = client.post(f"/admin/episodes/{ep['id']}/artwork/poster", headers=auth(), files={"file":("x.png",buf.getvalue(),"image/png")})
     assert res.status_code == 400
+
+def test_show_seasons_can_be_listed(client):
+    show = client.post("/admin/shows", headers=auth(), json={"title":"T","slug":"t"}).json()
+    season = client.post(f"/admin/shows/{show['id']}/seasons", headers=auth(), json={"number":1,"title":"Main"}).json()
+    response = client.get(f"/admin/shows/{show['id']}/seasons", headers=auth())
+    assert response.status_code == 200
+    assert response.json()["items"] == [season]

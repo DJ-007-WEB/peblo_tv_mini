@@ -32,11 +32,11 @@ these defaults outside local development; set strong values through environment
 secrets in a deployed environment.
 
 The seed import is idempotent. It imports the 95 supplied rows and retains the
-deliberate data problems in the validation workflow. The viewer is empty until
-an admin successfully publishes a catalogue. Open the CMS first, use the admin
-token, review the validation report, upload the supplied good artwork, resolve
-the duplicate variant, and publish. Invalid samples demonstrate the server-side
-error messages.
+deliberate data problems in the validation workflow. The seed command creates a
+bootstrap catalogue from published seed rows so the viewer has content
+immediately. Open the CMS first, use the admin token, review the validation
+report, resolve the remaining blockers, and publish to replace that bootstrap
+file. Invalid samples demonstrate the server-side error messages.
 
 ## Structure
 

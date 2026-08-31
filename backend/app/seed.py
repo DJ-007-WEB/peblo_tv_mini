@@ -4,6 +4,8 @@ from pathlib import Path
 import sys
 from sqlalchemy import select
 from .db import Base, SessionLocal, engine
+from .catalog import catalog_bytes
+from .config import CATALOG_PATH
 from .models import Artwork, Episode, Season, Show
 from .storage import storage
 
@@ -41,6 +43,10 @@ def seed(source: Path):
                 width, height = ARTWORK_DIMENSIONS[kind]
                 db.add(Artwork(episode_id=episode.id, kind=kind, path=path, width=width, height=height, size_bytes=len(data)))
         db.commit()
+        # A fresh demo gets useful viewer content before the first CMS publish.
+        # Later publishes replace this bootstrap file atomically.
+        if not CATALOG_PATH.exists() or storage.read_catalog() == b'{"sections":[]}':
+            storage.write_catalog_atomic(catalog_bytes(db), CATALOG_PATH)
     finally: db.close()
     return len(rows)
 
