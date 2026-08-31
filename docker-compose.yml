@@ -1,0 +1,59 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: peblo
+      POSTGRES_USER: peblo
+      POSTGRES_PASSWORD: peblo
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U peblo -d peblo"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg://peblo:peblo@db:5432/peblo
+      STORAGE_DIR: /app/storage
+      CATALOG_PATH: /app/storage/catalogue.json
+      EDITOR_TOKEN: ${EDITOR_TOKEN:-peblo-editor-token}
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-peblo-admin-token}
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["sh", "-c", "python -m app.seed /app/seed_shows.json && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+    volumes:
+      - api-storage:/app/storage
+    ports:
+      - "8000:8000"
+
+  cms:
+    build:
+      context: .
+      dockerfile: cms/Dockerfile
+      args:
+        VITE_API_BASE: http://localhost:8000
+    depends_on:
+      - api
+    ports:
+      - "4173:80"
+
+  viewer:
+    build:
+      context: .
+      dockerfile: viewer/Dockerfile
+      args:
+        VITE_API_BASE: http://localhost:8000
+    depends_on:
+      - api
+    ports:
+      - "4174:80"
+
+volumes:
+  postgres-data:
+  api-storage:
