@@ -147,7 +147,7 @@ All Links are provided here -
 banner_good.jpg
 CHALLENGE_Peblo_TV_Mini.docx thumb_tiny.jpg
  banner_too_big.png thumb_good.jpg poster_good.jpg
-poster_wrong_ratio.jpg 
+poster_wrong_ratio.jpg
 https://drive.google.com/file/d/1HmzUX8RURd8HssrLyIerWGfrp1vKcau6/view?usp=driv
 e_link
 https://drive.google.com/file/d/1ml25jnBvZ1kKDvvX7OOwxA2Qe7Ot7wJ5/view?usp=dri
