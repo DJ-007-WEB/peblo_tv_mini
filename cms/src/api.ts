@@ -39,12 +39,14 @@ export type Run = {
   episode_count: number;
   error?: string;
 };
+export type User = { name: string; role: "editor" | "admin" };
 let token = localStorage.getItem("peblo-token") ?? "";
 export const setToken = (value: string) => {
   token = value;
   localStorage.setItem("peblo-token", value);
 };
 export const getToken = () => token;
+export const getCurrentUser = () => request<User>("/auth/me");
 export async function request<T>(
   path: string,
   init: RequestInit = {},

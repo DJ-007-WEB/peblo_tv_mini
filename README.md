@@ -51,6 +51,16 @@ assets/            challenge artwork samples
 The viewer only calls `/catalog` and `/catalog/search`. Admin endpoints require
 bearer authentication; only the admin role can publish.
 
+### Roles
+
+- **Editor**: can create, view, edit, delete, and upload artwork for shows,
+  seasons, and episodes. The CMS hides the release desk from editors.
+- **Admin**: has all editor permissions plus validation reports, publish access,
+  and publish-run history.
+
+The API returns the authenticated role from `/auth/me` and enforces the same
+permissions server-side. The UI distinction is convenience, not security.
+
 ## Decisions
 
 - Publishing writes a complete temporary file, flushes it, and atomically

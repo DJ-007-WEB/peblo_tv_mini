@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import {
   getToken,
+  getCurrentUser,
   imageUrl,
   request,
   setToken,
@@ -9,6 +10,7 @@ import {
   type Run,
   type Season,
   type Show,
+  type User,
 } from "./api";
 
 const sections = ["featured", "series", "minisodes", "songs"];
@@ -41,12 +43,12 @@ function Button({
   );
 }
 
-function Login({ onLogin }: { onLogin: () => void }) {
+function Login({ onLogin }: { onLogin: (user: User) => void }) {
   const [value, setValue] = useState("");
   const [error, setError] = useState("");
   const enter = (token: string) => {
     setToken(token);
-    request("/health")
+    getCurrentUser()
       .then(onLogin)
       .catch(() =>
         setError(
@@ -566,7 +568,7 @@ function Publish({
   );
 }
 
-function Content({ onLogout }: { onLogout: () => void }) {
+function Content({ onLogout, user }: { onLogout: () => void; user: User }) {
   const [tab, setTab] = useState<"shows" | "publish">("shows");
   const [shows, setShows] = useState<Show[]>([]);
   const [loading, setLoading] = useState(true);
@@ -593,7 +595,7 @@ function Content({ onLogout }: { onLogout: () => void }) {
     refresh();
   }, [q, status, section, language]);
   useEffect(() => {
-    if (tab === "publish") {
+    if (tab === "publish" && user.role === "admin") {
       request<Report>("/admin/validation-report")
         .then(setReport)
         .catch((e) => setError((e as Error).message));
@@ -601,7 +603,7 @@ function Content({ onLogout }: { onLogout: () => void }) {
         .then((x) => setRuns(x.items))
         .catch(() => {});
     }
-  }, [tab]);
+  }, [tab, user.role]);
   const visible = shows.slice((page - 1) * 8, page * 8);
   return (
     <div className="app-shell">
@@ -615,8 +617,8 @@ function Content({ onLogout }: { onLogout: () => void }) {
         <div className="workspace">
           <span className="avatar">E</span>
           <div>
-            <strong>Editorial team</strong>
-            <small>Studio workspace</small>
+            <strong>{user.role === "admin" ? "Catalogue admin" : "Editorial team"}</strong>
+            <small>{user.role === "admin" ? "Publishing access" : "Content access"}</small>
           </div>
         </div>
         <nav>
@@ -626,12 +628,12 @@ function Content({ onLogout }: { onLogout: () => void }) {
           >
             ▦ <span>Shows</span>
           </button>
-          <button
+          {user.role === "admin" && <button
             className={tab === "publish" ? "active" : ""}
             onClick={() => setTab("publish")}
           >
             ◈ <span>Publish</span>
-          </button>
+          </button>}
         </nav>
         <div className="aside-bottom">
           <small>PEBLO TV MINI</small>
@@ -642,7 +644,7 @@ function Content({ onLogout }: { onLogout: () => void }) {
         <header>
           <div>
             <p className="eyebrow">
-              {tab === "shows" ? "CONTENT LIBRARY" : "RELEASE DESK"}
+              {tab === "shows" ? `${user.role.toUpperCase()} CONTENT LIBRARY` : "ADMIN RELEASE DESK"}
             </p>
             <h1>{tab === "shows" ? "Your shows" : "Ready for launch?"}</h1>
           </div>
@@ -743,9 +745,14 @@ function Content({ onLogout }: { onLogout: () => void }) {
 }
 
 export function App() {
+  const [user, setUser] = useState<User>();
   const [token, setLocalToken] = useState(getToken());
-  return token ? (
+  useEffect(() => {
+    if (token) getCurrentUser().then(setUser).catch(() => { setToken(""); setLocalToken(""); });
+  }, [token]);
+  return token && user ? (
     <Content
+      user={user}
       onLogout={() => {
         localStorage.removeItem("peblo-token");
         setToken("");
@@ -753,6 +760,6 @@ export function App() {
       }}
     />
   ) : (
-    <Login onLogin={() => setLocalToken(getToken())} />
+    <Login onLogin={(nextUser) => { setUser(nextUser); setLocalToken(getToken()); }} />
   );
 }

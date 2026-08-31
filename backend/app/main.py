@@ -41,6 +41,10 @@ def ensure_episode_key(db, content_group, language, exclude_id=None):
 def health(db: Session = Depends(get_db)):
     db.execute(select(1)); return {"status": "ok"}
 
+@app.get("/auth/me")
+def me(user=Depends(require_editor)):
+    return user
+
 @app.get("/admin/shows")
 def list_shows(q: str | None = None, section: str | None = None, status: str | None = None, language: str | None = None, db: Session = Depends(get_db), _=Depends(require_editor)):
     shows = db.scalars(select(Show).order_by(Show.title, Show.id)).all()

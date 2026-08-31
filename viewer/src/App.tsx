@@ -200,7 +200,7 @@ function App() {
               </p>
             </div>
           </section>
-          <section className="filters">
+          <section className="filters" id="browse">
             <div className="filter-search">
               ⌕
               <input
@@ -227,7 +227,7 @@ function App() {
               <option value="hi">हिन्दी</option>
             </select>
           </section>
-          <div className="rows">
+          <div className="rows" id="new">
             {sections.map((section) => (
               <section className="row" key={section.name}>
                 <div className="row-title">
@@ -270,8 +270,8 @@ function Header({
         peblo<span>tv</span>
       </a>
       <nav className={menu ? "open" : ""}>
-        <a href="#browse">Browse</a>
-        <a href="#new">New this week</a>
+        <a href="#browse" onClick={() => setMenu(false)}>Browse</a>
+        <a href="#new" onClick={() => setMenu(false)}>New this week</a>
       </nav>
       <div className="header-search">
         ⌕
