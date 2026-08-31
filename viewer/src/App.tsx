@@ -37,15 +37,17 @@ function Art({
   wide?: boolean;
 }) {
   const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
   return (
     <div className={`art ${wide ? "wide-art" : ""}`}>
-      {!loaded && <Placeholder wide={wide} />}{" "}
-      {url && (
+      {!loaded && <Placeholder wide={wide} />}
+      {(!url || failed) && <div className="art-fallback"><span>✦</span><strong>Peblo TV</strong><small>{alt || "A little story"}</small></div>}
+      {url && !failed && (
         <img
           src={imageUrl(url)}
           alt={alt}
           onLoad={() => setLoaded(true)}
-          onError={() => setLoaded(true)}
+          onError={() => { setFailed(true); setLoaded(true); }}
           style={{ opacity: loaded ? 1 : 0 }}
         />
       )}
@@ -57,10 +59,11 @@ function Card({ show, onOpen }: { show: Show; onOpen: (show: Show) => void }) {
     .flatMap((s) => s.episodes)
     .find((e) => e.artwork.poster)?.artwork.poster;
   return (
-    <button className="card" onClick={() => onOpen(show)}>
-      <Art url={art} alt="" />
-      <span>{show.title}</span>
-      <small>{show.categories.slice(0, 2).join(" · ")}</small>
+    <button className="card" onClick={() => onOpen(show)} aria-label={`Open ${show.title}`}>
+      <Art url={art} alt={show.title} />
+      <span className="card-title">{show.title}</span>
+      <small className="card-meta">{show.section || "Peblo stories"}</small>
+      <small className="card-tags">{show.categories.slice(0, 2).join("  ·  ")}</small>
     </button>
   );
 }
@@ -75,12 +78,13 @@ function ShowDetail({ show, onBack }: { show: Show; onBack: () => void }) {
       </button>
       <div className="detail-top">
         <div className="detail-copy">
-          <p className="kicker">{show.categories.join("  ·  ")}</p>
+          <p className="kicker">{show.section || "PEBLO TV"}  ·  {show.categories.slice(0, 3).join("  ·  ")}</p>
           <h1>{show.title}</h1>
           <p>{show.synopsis || "A new adventure is waiting."}</p>
           <div className="detail-meta">
-            <span>✦ {seasons.length} seasons</span>
-            <span>◉ All ages</span>
+            <span>✦ {seasons.length} {seasons.length === 1 ? "season" : "seasons"}</span>
+            <span>◉ {seasons.reduce((total, season) => total + season.episodes.length, 0)} episodes</span>
+            <span>◎ All ages</span>
           </div>
         </div>
         {hero && (
@@ -116,7 +120,7 @@ function ShowDetail({ show, onBack }: { show: Show; onBack: () => void }) {
 function EpisodeCard({ episode }: { episode: Episode }) {
   return (
     <article className="episode-card">
-      <Art url={episode.artwork.thumbnail} alt="" />
+      <Art url={episode.artwork.thumbnail} alt={episode.title} />
       <div className="episode-info">
         <span className="episode-no">
           EP {String(episode.episode_number).padStart(2, "0")}
@@ -129,7 +133,7 @@ function EpisodeCard({ episode }: { episode: Episode }) {
         </p>
         <div className="languages">
           {episode.languages.map((l) => (
-            <span key={l}>{l === "en" ? "English" : "हिन्दी"}</span>
+            <span key={l}>{l === "en" ? "English" : l === "hi" ? "हिन्दी" : l}</span>
           ))}
         </div>
       </div>
@@ -193,7 +197,7 @@ function App() {
         <main>
           <section className="hero">
             <div className="hero-copy">
-              <p className="kicker">PEBLO TV · NEW STORIES</p>
+              <p className="kicker">PEBLO TV  ·  NEW STORIES</p>
               <h1>Big little adventures</h1>
               <p>
                 Stories made for curious minds and the grown-ups who watch with them.
@@ -232,7 +236,7 @@ function App() {
               <section className="row" key={section.name}>
                 <div className="row-title">
                   <h2>{section.name}</h2>
-                  <span>{section.shows.length} shows</span>
+                  <span>{section.shows.length} {section.shows.length === 1 ? "show" : "shows"} <b>→</b></span>
                 </div>
                 <div className="cards">
                   {section.shows.map((s) => (
