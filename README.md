@@ -129,6 +129,19 @@ redeploy the previous image SHA and restore the previous catalogue pointer;
 database migrations should use an expand/contract process and be rolled forward
 rather than destructively downgraded.
 
+### Render Bootstrap
+
+The repository includes `render.yaml` for a generic Render deployment. In the
+Render dashboard, create a Blueprint from this repository, then enter strong
+values for `EDITOR_TOKEN` and `ADMIN_TOKEN` when prompted. The Blueprint creates
+the API, CMS, viewer, PostgreSQL database, and a persistent API storage disk.
+After the first deploy, confirm the generated service hostnames match the
+`VITE_API_BASE` and `ALLOWED_ORIGINS` values in `render.yaml`; update those
+values if Render assigns different names and redeploy the two frontend services.
+The API command runs Alembic, imports the seed data idempotently, and starts
+only after the database is reachable. The CMS is available at the CMS service
+URL and the public viewer at the viewer service URL.
+
 ## Scope
 
 Versioned catalogue rollback, dry-run diffs, audit history, video streaming, and

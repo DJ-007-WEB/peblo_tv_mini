@@ -1,4 +1,5 @@
-export const API = import.meta.env.VITE_API_BASE ?? 'http://localhost:8000'
+declare global { var __PEBLO_API_BASE__: string | undefined }
+export const API = globalThis.__PEBLO_API_BASE__ || import.meta.env.VITE_API_BASE || 'http://localhost:8000'
 export type Episode = { episode_number: number; title: string; duration_seconds: number | null; languages: string[]; artwork: Record<string,string> }
 export type Season = { number: number; title: string; episodes: Episode[] }
 export type Show = { slug: string; title: string; synopsis: string; categories: string[]; seasons: Season[]; section?: string }

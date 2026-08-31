@@ -45,6 +45,8 @@ services:
       dockerfile: cms/Dockerfile
       args:
         VITE_API_BASE: http://localhost:8000
+    environment:
+      API_BASE_URL: http://localhost:8000
     depends_on:
       api:
         condition: service_healthy
@@ -57,6 +59,8 @@ services:
       dockerfile: viewer/Dockerfile
       args:
         VITE_API_BASE: http://localhost:8000
+    environment:
+      API_BASE_URL: http://localhost:8000
     depends_on:
       api:
         condition: service_healthy
