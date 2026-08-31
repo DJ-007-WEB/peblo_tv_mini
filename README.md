@@ -143,6 +143,9 @@ the generated service hostnames match the `VITE_API_BASE` and
 assigns different names and redeploy the frontend services.
 The API root returns a service-status response; use `/health/ready` for
 readiness and `/docs` for interactive API documentation.
+The API service owns the `EDITOR_TOKEN` and `ADMIN_TOKEN` secrets. The Blueprint
+generates them for new environments; existing Render services must be synced
+with the Blueprint or have those two variables added manually.
 
 The free Render tier has an ephemeral filesystem and may sleep when idle, so
 uploaded artwork and a locally generated catalogue are not durable across

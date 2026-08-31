@@ -19,9 +19,9 @@ services:
       - key: ALLOWED_ORIGINS
         value: https://peblo-cms.onrender.com,https://peblo-viewer.onrender.com
       - key: EDITOR_TOKEN
-        sync: false
+        generateValue: true
       - key: ADMIN_TOKEN
-        sync: false
+        generateValue: true
 
   - type: web
     name: peblo-cms
